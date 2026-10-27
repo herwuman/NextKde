@@ -50,6 +50,19 @@ Current operation groups are:
   `file.create-file`, `file.transfer`, `file.trash`, `file.trash-state`,
   `file.empty-trash`, `file.open-trash`, `file.open-with`, `file.set-default`,
   `file.open-kde`
+- `file.read-text` and `file.write-text` (small documents, for surfaces that
+  must not touch the filesystem from QML. `read-text` takes an absolute `path`
+  and an optional `limit`, clamped to 4 KiB-32 MiB with a 4 MiB default;
+  non-files fail with `missing` and anything larger with `too-large` rather
+  than being truncated. It returns `{text,bytes}`, decoded as UTF-8.
+  `write-text` takes the same `path` plus `text`, and replaces the file
+  atomically through `QSaveFile`, returning the committed `{bytes}` so a
+  caller can tell a short write from a success; failure codes are
+  `invalid-path`, `open-failed`, `write-failed` and `commit-failed`. With
+  `mkdir: true` the parent directories are created before the write. Both
+  operations use the same path cleaning as `file.copy` — absolute, no NUL,
+  canonicalised, never through a symlinked parent — and neither reads or
+  writes a directory.)
 - `kwin.subscribe`, `kwin.command`, `kwin.layout.update`
 - `kwin.animation.update-targets`, `kwin.animation.prepare-launch`
 - `wallpaper.plasma.proxy` (replace every screen's Plasma wallpaper with a KOS
@@ -207,6 +220,31 @@ reported through the common response envelope.
 
 - `network.applications` (read): returns `{scope: "user-tcp", sockets: [{id, name, pid, rxBytes, txBytes}]}` from `ss -tinpeOH`. Visible-owner TCP counters are sampled per socket before grouping by process name. Local proxy connections may count the same traffic twice. UDP/QUIC, inaccessible owners, and connections closed between samples are excluded. These totals are independent of interface totals.
 - `power.profiles` (read): returns `{profiles, activeProfile, degraded}` from `powerprofilesctl list`.
+- `power.battery` (read): takes `{}` and returns `{available, complete, batteries, adapters}`
+  from bounded reads of `/sys/class/power_supply/*/uevent` (at most 64 devices,
+  16 KiB each). `complete` is false if enumeration is unavailable, exceeds the
+  device limit, or any device read fails, is empty/oversized, or lacks a type.
+  Incomplete samples must not be used for whole-system battery aggregation or
+  pack-specific fields; the Shell falls back to UPower capacity/health instead.
+  All online adapter nodes are displayed separately, including nodes without
+  telemetry. No helper, system mutation, or caller-supplied path. `batteries`
+  contains present system packs with `name`, `model` and optional `energyFullWh`,
+  `energyDesignWh`, `chargeFullMah`, `chargeDesignMah`, `powerWatts`, `currentMa`,
+  `voltage`, `cycles`, `temperature` (°C). Charge-based energy conversion uses
+  design voltage. `adapters` contains online Mains/USB supplies with `name` and
+  optional `powerWatts`, `ratedPowerWatts`, `currentMa`, `voltage`. Missing or
+  invalid attributes are omitted; zero is a valid measured value. Adapter power
+  is never inferred from battery power. The Shell reads on open and every ten
+  seconds while open, drops stale replies after close/disconnect, and otherwise
+  continues using UPower's event-driven charge/state/time/health data. Multiple
+  battery capacities are combined in Wh only; pack-specific voltage, current,
+  cycle and temperature fields are unavailable for a combined display.
 - `power.profile.set` (write): accepts `{profile: "power-saver" | "balanced" | "performance"}`. System authorization is retained; success is followed by a readback before confirming the selected profile.
 
-The optional `ss` and `powerprofilesctl` helpers must be installed for these operations. Missing helpers report unavailable states. The independent Power settings page also uses `powerprofilesctl` and observes system D-Bus profile changes; it is available without a battery or running shell.
+The optional `ss` and `powerprofilesctl` helpers must be installed for application
+traffic and power-profile operations respectively. Missing helpers report
+unavailable states. Battery telemetry needs neither helper; an unavailable or
+older platform daemon leaves extra metrics as `—` while UPower charge/state,
+available capacity, time and health continue to update. The independent Power
+settings page also uses `powerprofilesctl` and observes system D-Bus profile
+changes; it is available without a battery or running shell.

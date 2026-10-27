@@ -16,6 +16,7 @@ kos_add_application(kos-weather
     QML_FILES
         qml/Main.qml
         qml/WeatherIcon.qml
+        qml/WeatherLoadingIndicator.qml
     LINK_LIBRARIES
         Qt6::Network
 )
@@ -28,6 +29,19 @@ target_include_directories(kos-weather PRIVATE
 add_dependencies(kos-weather kos-data-service-build)
 target_compile_definitions(kos-weather PRIVATE
     KOS_DATA_SERVICE_BUILD_PATH="${KOS_DATA_SERVICE_EXECUTABLE}"
+)
+
+# 批 7/11｜雪粒子 sprite（程序化生成，无外部美术资源）；雨 sprite 已随批 11
+# 删除下落雨粒子层一并移除。与 QML 模块同前缀打包。
+# 批 12｜雨改折射：drop-offset.png（偏移图，PIL 脚本生成）+ 折射 shader。
+qt_add_resources(kos-weather "weather_particles"
+    PREFIX "/qt/qml/Kos/Apps/Weather"
+    BASE ${CMAKE_CURRENT_SOURCE_DIR}
+    FILES
+        qml/particles/snow.png
+        qml/particles/drop-offset.png
+        qml/shaders/rain_refract.vert.qsb
+        qml/shaders/rain_refract.frag.qsb
 )
 endif()
 

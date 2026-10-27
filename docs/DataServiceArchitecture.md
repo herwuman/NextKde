@@ -15,6 +15,7 @@ The JSONL envelope, state roots and operations are documented below.
 | `desktop.go` | Desktop directory snapshots, reconciliation and filesystem watching |
 | `desktop_placement.go` | Desktop screen assignment and placement persistence |
 | `weather.go` | Weather provider, refresh policy and normalized weather state |
+| `files.go` | Home-directory file index behind the island's Finder: walk bounds, fuzzy scoring and stale-reference resolution |
 | `persistence.go` | Serialized, atomic state and snapshot writes |
 | `subscriptions.go` | Subscriber lifetime, serialized JSONL writes and event publication |
 | `protocol.go` | Request/response/error envelopes, operation dispatch and Socket serving |
@@ -68,7 +69,8 @@ Supported operations are:
 - `activity.snapshot` and `activity.active-app`;
 - `desktop.snapshot`, `desktop.refresh`, `desktop.outputs` and `desktop.place`;
 - `weather.snapshot`, `weather.search`, `weather.refresh`,
-  `weather.set-location`, and `weather.set-units`.
+  `weather.set-location`, and `weather.set-units`;
+- `files.search`, `files.resolve` and `files.refresh`.
 
 Desktop changes are pushed as `desktop.changed` events after a complete
 directory scan has been persisted. A completed weather state transition is
@@ -87,6 +89,39 @@ The weather payload itself follows
 The service requests at most 48 hourly and seven daily points, refreshes after
 one hour, and marks data stale after two hours. Failed refreshes preserve the
 last complete forecast and expose the error alongside it.
+
+## File index
+
+`files.go` owns the index behind the island's Finder. The original app shells
+out to `fd`; QML may not run commands, so the walk lives in the service and the
+shell only sends a query.
+
+- The walk happens once and produces a snapshot. It stops at 40 000 entries and
+  12 directory levels, skips hidden files and directories, and skips
+  `node_modules`, `venv`, `.venv`, `__pycache__`, `target` and `vendor`. Only
+  regular files are indexed.
+- `startFileIndexRefresh` rebuilds it in its own goroutine every ten minutes,
+  and `files.refresh` asks for the same rebuild. The first build happens on
+  demand: `files.search` and `files.resolve` build synchronously when the index
+  has never been populated, so the first query after a service start waits for
+  the walk while later ones answer from the snapshot. That walk runs on the
+  connection's goroutine, so a client sharing one socket with other operations
+  sees them queued behind it.
+- `files.search` (`{query, limit}`, limit default 20 and clamped to 100) returns
+  `{results, indexed, ready}`; an empty query returns the most recently
+  modified files, and a non-empty one is scored as a subsequence match on the
+  name, preferring consecutive hits and word boundaries. `indexed` is the size
+  of the snapshot that answered, so a client can tell a truncated index from a
+  complete one.
+- `files.resolve` (`{path, name}`) backs a shelf entry that keeps a reference
+  rather than a copy: it returns the original path while it still exists, and
+  otherwise the most recently modified indexed file with the same name, as
+  `{path, found, moved}`.
+- `files.refresh` accepts a rebuild and returns `{accepted}` immediately; the
+  list fills in once the background walk finishes.
+
+The index never leaves the per-user socket and no path outside `$HOME` is
+walked.
 
 
 ## Operations

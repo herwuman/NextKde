@@ -109,7 +109,6 @@ public:
     Q_INVOKABLE void updateGlobalIconMode(const QString& mode);
     Q_INVOKABLE void updateGlobalIconOpacity(double opacity);
     Q_INVOKABLE void updateGlobalIconTintColor(const QString& color);
-    Q_INVOKABLE void updateTrayFollowsBarColor(bool enabled);
     Q_INVOKABLE void updateShellStyle(const QString& style);
     Q_INVOKABLE void updateMaterialColorScheme(const QString& scheme);
     Q_INVOKABLE void updateBarIntegratedWithDock(bool enabled);
@@ -183,6 +182,8 @@ signals:
     void systemAppearanceApplied(bool accepted);
     // 后台缩略图生成完毕;页面收到后重新求值瓦片缩略图绑定,下次直接命中缓存。
     void wallpaperThumbnailChanged();
+    void galleryImportProgress(int imported);
+    void galleryImportFinished(int imported);
     void fgSchedSnapshotChanged(const QVariantMap& snapshot);
     void fgSchedRunningAppsChanged(const QVariantList& apps);
     void fgSchedMemStatusChanged(const QVariantMap& status);

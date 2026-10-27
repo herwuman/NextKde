@@ -21,6 +21,7 @@
     "kos-platform.jsonl-client",
     "kos-platform.contracts",
     "kos-glass.legacy-blur-region",
+    "kos-glass.desktop-blur",
     "kos-platform.status-panel-data",
     "kos-platform.status-panel-operations"
   ],
@@ -32,6 +33,7 @@
     "kos-deskcenter.density-metrics",
     "kos-deskcenter.widget-layout",
     "kos-deskcenter.desktop-outputs",
+    "kos-deskcenter.desktop-stack",
     "kos-shell.date-buckets",
     "kos-shell.date-projection",
     "kos-shell.squircle",
@@ -60,17 +62,25 @@
     "kos-ui.traditional-color",
     "kos-settings.window-config",
     "kos-settings.backend-modules",
+    "kos-settings.app-store",
     "kos-dock.model",
     "kos-dock.policy",
     "kos-dock.motion",
     "kos-shell.application-traffic",
+    "kos-shell.battery-data",
     "kos-shell.traffic-history",
     "kos-settings.power-config"
+  ],
+  "widgets": [
+    "kos-ui.widget-experience",
+    "kos-ui.widget-resize"
   ],
   "headless": [
     "kos-calculator.engine",
     "kos-shell.dock-selection-highlight",
     "kos-shell.desktop-lyrics",
+    "kos-shell.notification-policy-production",
+    "kos-shell.notification-pane",
     "kos-ui.interaction-controls",
     "kos-ui.shared-motion",
     "kos-ui.kinetic-scroll",

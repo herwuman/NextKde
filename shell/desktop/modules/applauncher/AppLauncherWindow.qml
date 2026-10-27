@@ -1421,6 +1421,8 @@ PanelWindow {
 
                                     LiquidControls.LiquidTextField {
                                         id: searchBar
+                                        renderType: searchEntrance.scale === 1
+                                            ? TextInput.NativeRendering : TextInput.QtRendering
                                         anchors.fill: parent
                                         // Entrance motion belongs to the wrapper; focus
                                         // must not start a second scale animation.
@@ -1563,7 +1565,7 @@ PanelWindow {
                                 }
                                 color: Qt.rgba(0.027, 0.753, 0.376, 1.0)
 
-                                Text {
+                                ShellText {
                                     anchors.centerIn: parent
                                     text: I18n.tr("Done")
                                     color: "white"
@@ -1621,8 +1623,14 @@ PanelWindow {
                             readonly property int fullscreenRowCount: root.isFullscreenMode
                                 ? Math.max(1, Math.min(5,
                                     Math.floor(fullscreenAvailableHeight / cellHeight))) : 0
+                            // Card presentations start the scrolling viewport
+                            // below the search header, so a scrolled row can
+                            // never paint over or behind the field.
+                            readonly property real cardGridTop:
+                                header.y + header.height + 8
                             height: root.isFullscreenMode
-                                ? fullscreenRowCount * cellHeight : parent.height - 32
+                                ? fullscreenRowCount * cellHeight
+                                : parent.height - cardGridTop - 18
                             x: Math.round((parent.width - width) / 2)
                             y: root.isFullscreenMode
                                 // Keep Launchpad content visually connected to
@@ -1631,17 +1639,13 @@ PanelWindow {
                                 // short grid in all remaining vertical space.
                                 ? fullscreenTopClearance + Math.round(Math.min(24,
                                     Math.max(0, fullscreenAvailableHeight - height) * 0.20))
-                                : 14
+                                : cardGridTop
                             clip: true
                             interactive: !root.isFullscreenMode
                             boundsBehavior: Flickable.StopAtBounds
-                            // Reserve the search header in the resting
-                            // layout without moving the viewport itself. The
-                            // first row therefore never crowds the input, but
-                            // scrolling tiles can still travel behind the
-                            // header and emerge naturally below it.
-                            topMargin: root.isFullscreenMode ? 0
-                                : header.height + 8
+                            // The viewport already begins below the header;
+                            // no extra top inset is needed for card modes.
+                            topMargin: 0
                             // The visible card and grid cell share one source
                             // of truth. Density supplies the desired gap; cell
                             // width is then evenly divided across the usable
@@ -2316,7 +2320,7 @@ PanelWindow {
                                     }
                                 }
 
-                                Text {
+                                ShellText {
                                     id: folderTitle
                                     anchors.centerIn: parent
                                     visible: !root.folderRenameActive
@@ -2339,6 +2343,8 @@ PanelWindow {
 
                                 TextInput {
                                     id: folderNameInput
+                                    renderType: folderDialog.scale === 1
+                                        ? TextInput.NativeRendering : TextInput.QtRendering
                                     anchors.centerIn: parent
                                     visible: root.folderRenameActive
                                     width: Math.min(180, parent.width - 100)
@@ -2379,7 +2385,7 @@ PanelWindow {
                                         ThemeService.foregroundColor.b, 0.68)
                                 }
 
-                                Text {
+                                ShellText {
                                     anchors {
                                         right: parent.right
                                         verticalCenter: parent.verticalCenter
@@ -2610,7 +2616,7 @@ PanelWindow {
                                                 rightMargin: -5
                                             }
                                             color: Qt.rgba(0.95, 0.27, 0.25, 0.96)
-                                            Text {
+                                            ShellText {
                                                 anchors.centerIn: parent
                                                 text: "−"
                                                 color: "white"
@@ -2745,7 +2751,7 @@ PanelWindow {
                                 Item {
                                     width: parent.width
                                     height: 30
-                                    Text {
+                                    ShellText {
                                         anchors {
                                             left: parent.left
                                             verticalCenter: parent.verticalCenter
@@ -2884,6 +2890,7 @@ PanelWindow {
                                     clip: true
                                     TextInput {
                                         id: appEditorNameInput
+                                        renderType: TextInput.NativeRendering
                                         anchors.fill: parent
                                         anchors.leftMargin: 10
                                         anchors.rightMargin: 10
@@ -2927,6 +2934,7 @@ PanelWindow {
                                         selectedTextColor: AppLauncherService.dockForegroundColor
                                         selectByMouse: true
                                         text: root.editorIcon
+                                        renderType: TextInput.NativeRendering
                                         onTextEdited: root.editorIcon = text
 
                                         HoverHandler {

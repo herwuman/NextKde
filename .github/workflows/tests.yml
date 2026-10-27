@@ -2,17 +2,13 @@ name: tests
 
 # Pull requests and the default branch share one configuration so that "green"
 # means exactly the same thing in both places.
+# Tray identity/rendering and extensions UI checks run in the regular jobs;
+# no separate manual run is needed to complete their coverage.
 on:
   push:
     branches: [main, 'release/**']
   pull_request:
   workflow_dispatch:
-    inputs:
-      scope:
-        description: Checks to execute
-        type: choice
-        options: [all, tray]
-        default: all
 
 # A superseded run on the same branch tells us nothing, so cancel it.
 concurrency:
@@ -24,7 +20,6 @@ permissions:
 
 jobs:
   source-release:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope != 'tray' }}
     name: source release selection
     runs-on: ubuntu-24.04
     steps:
@@ -34,13 +29,14 @@ jobs:
 
       - name: Test release selection without installing the desktop
         run: python3 -m unittest discover -s tools/tests -p 'test_*release*.py'
+      - name: Check KMusic catalogue preparation
+        run: python3 -m unittest discover -s tools/tests -p 'test_kmusic_catalog.py'
       - name: Check project contracts and documentation
         run: |
           python3 platform/tests/test_contract.py
           python3 tools/check-docs.py
 
   tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope != 'tray' }}
     name: data + platform + logic + headless
     runs-on: ubuntu-24.04
     env:
@@ -75,7 +71,7 @@ jobs:
             extra-cmake-modules wayland plasma-workspace libplasma kpackage \
             kwindowsystem kiconthemes kglobalaccel kio kconfig \
             go dbus nodejs python opencv onnxruntime-cpu \
-            quickshell kwin python-pillow mesa libcap
+            quickshell kwin python-pillow mesa vulkan-swrast libcap
 
       # Arch gives KWin CAP_SYS_NICE, which Docker's default capability
       # bounding set excludes. execve then fails with EPERM before KWin starts.
@@ -130,16 +126,25 @@ jobs:
             --output-log "$GITHUB_WORKSPACE/.build/tests/test-results/logic.log" \
             --output-junit "$GITHUB_WORKSPACE/.build/tests/test-results/logic.xml"
 
-      - name: Render monochrome tray templates on a private compositor
+      - name: Render tray icons and appearance settings on a private compositor
         if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
         env:
           KOS_TRAY_COLOR_QA: ${{ github.workspace }}/.build/tests/test-results/tray-color
         run: |
           mkdir -p .build/tests/test-results
           ctest --test-dir .build/tests --output-on-failure --no-tests=error \
-            -R '^kos-ui.tray-(color|template-fallback)$' \
+            -R '^kos-ui.tray-color$' \
             --output-log "$GITHUB_WORKSPACE/.build/tests/test-results/tray-color.log" \
             --output-junit "$GITHUB_WORKSPACE/.build/tests/test-results/tray-color.xml"
+
+      - name: Render battery and traffic panels on a private compositor
+        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
+        run: |
+          mkdir -p .build/tests/test-results
+          ctest --test-dir .build/tests --output-on-failure --no-tests=error \
+            -R '^kos-ui.status-panels(-opengl)?$' \
+            --output-log "$GITHUB_WORKSPACE/.build/tests/test-results/status-panels.log" \
+            --output-junit "$GITHUB_WORKSPACE/.build/tests/test-results/status-panels.xml"
 
       - name: Run offscreen UI regressions
         if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
@@ -149,6 +154,17 @@ jobs:
             -L '^headless$' \
             --output-log "$GITHUB_WORKSPACE/.build/tests/test-results/headless.log" \
             --output-junit "$GITHUB_WORKSPACE/.build/tests/test-results/headless.xml"
+
+      - name: Run widget appearance and countdown rendering regressions
+        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
+        env:
+          KOS_WIDGET_QA: ${{ github.workspace }}/.build/tests/test-results/widget-experience
+        run: |
+          mkdir -p .build/tests/test-results
+          ctest --test-dir .build/tests --output-on-failure --no-tests=error \
+            -L '^widgets$' \
+            --output-log "$GITHUB_WORKSPACE/.build/tests/test-results/widgets.log" \
+            --output-junit "$GITHUB_WORKSPACE/.build/tests/test-results/widgets.xml"
 
       - name: Summarise actual test results
         if: always()
@@ -163,11 +179,11 @@ jobs:
           if-no-files-found: warn
           path: |
             .build/tests/test-results/
+            .build/tests/apps/settings/extensions-*.png
             .build/tests/Testing/Temporary/
             .build/tests/CMakeFiles/CMakeConfigureLog.yaml
 
   kwin-plugins:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope != 'tray' }}
     name: KWin ${{ matrix.series }} SDK build and offline checks
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -291,7 +307,6 @@ jobs:
             .build/glass/CMakeFiles/CMakeConfigureLog.yaml
 
   applications:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope != 'tray' }}
     name: Calendar Calculator Weather build and tests
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -327,47 +342,3 @@ jobs:
             .build/applications/Testing/Temporary/
             .build/applications/CMakeFiles/CMakeConfigureLog.yaml
 
-  tray:
-    name: tray identity + rendering + missing-template fallback
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.scope == 'tray' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 12
-    container:
-      image: archlinux:base-devel
-      options: --device=/dev/udmabuf
-    env:
-      QT_FORCE_STDERR_LOGGING: "1"
-      QT_LOGGING_RULES: "kwin_core.debug=true"
-      KOS_TRAY_COLOR_QA: ${{ github.workspace }}/.build/tray-results
-      QML_IMPORT_PATH: ${{ github.workspace }}/.build/tray-native/qml
-    steps:
-      - name: Install tray runtime and bridge build dependencies
-        run: |
-          pacman -Syu --noconfirm --needed git cmake ninja gcc extra-cmake-modules wayland \
-            qt6-base qt6-declarative qt6-wayland qt6-5compat quickshell kwin mesa \
-            libcap dbus nodejs python-pillow
-      - uses: actions/checkout@v7
-      - name: Prepare the software compositor
-        run: sh tools/ci-prepare-kwin.sh
-      - name: Check tray identity, exact templates and attention matching
-        run: |
-          node shell/desktop/modules/bar/test_tray_identity.mjs
-          node shell/desktop/modules/common/test_tray_attention_match.mjs
-      - name: Build only the native QML bridge used by tray components
-        id: native
-        run: |
-          cmake -S shell/native/surface-shape -B .build/tray-native -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build .build/tray-native --parallel 2
-      - name: Check tray rendering and appearance settings
-        if: ${{ !cancelled() && steps.native.outcome == 'success' }}
-        run: python tests/tray-color/run.py
-      - name: Check missing-template fallback without binding loops
-        if: ${{ !cancelled() && steps.native.outcome == 'success' }}
-        run: python tests/tray-color/run.py --missing-template
-      - name: Upload tray diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: tray-results
-          path: .build/tray-results/
-          if-no-files-found: warn

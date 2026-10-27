@@ -245,18 +245,17 @@ bool PlatformServer::handleFileOperation(QLocalSocket *socket, const QJsonObject
 
     if (op == QStringLiteral("file.write-text")) {
         const QString requested = payload.value(QStringLiteral("path")).toString();
-        // cleanCreatePath refuses a path whose parent does not exist, which is
-        // the right rule for a copy target the caller was supposed to have
-        // prepared. A document store cannot pre-create anything through this
-        // protocol, so an explicit mkdir flag is honoured first, and the path
-        // is re-cleaned afterwards -- the security check still runs, it just
-        // runs on a directory this daemon created.
+        // cleanCreatePath already accepts a parent chain that does not exist
+        // yet: it canonicalises the deepest existing ancestor and appends the
+        // missing components, which is what keeps the write inside a real
+        // directory boundary. QSaveFile cannot create directories, though, so
+        // a document store that has no way to pre-create its own folder asks
+        // for one with mkdir. The directory is created under the path that was
+        // just cleaned, so the symlink and file-not-directory checks above
+        // still decide where the write lands.
         QString path = cleanCreatePath(requested);
-        if (path.isEmpty() && payload.value(QStringLiteral("mkdir")).toBool(false)
-                && QFileInfo(requested).isAbsolute()) {
-            QDir().mkpath(QFileInfo(requested).absolutePath());
-            path = cleanCreatePath(requested);
-        }
+        if (!path.isEmpty() && payload.value(QStringLiteral("mkdir")).toBool(false))
+            QDir().mkpath(QFileInfo(path).absolutePath());
         if (path.isEmpty()) {
             respond(socket, request, false, {}, QStringLiteral("invalid-path"),
                     QStringLiteral("文件路径无效"), false);
