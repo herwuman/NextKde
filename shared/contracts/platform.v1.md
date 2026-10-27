@@ -50,6 +50,19 @@ Current operation groups are:
   `file.create-file`, `file.transfer`, `file.trash`, `file.trash-state`,
   `file.empty-trash`, `file.open-trash`, `file.open-with`, `file.set-default`,
   `file.open-kde`
+- `file.read-text` and `file.write-text` (small documents, for surfaces that
+  must not touch the filesystem from QML. `read-text` takes an absolute `path`
+  and an optional `limit`, clamped to 4 KiB-32 MiB with a 4 MiB default;
+  non-files fail with `missing` and anything larger with `too-large` rather
+  than being truncated. It returns `{text,bytes}`, decoded as UTF-8.
+  `write-text` takes the same `path` plus `text`, and replaces the file
+  atomically through `QSaveFile`, returning the committed `{bytes}` so a
+  caller can tell a short write from a success; failure codes are
+  `invalid-path`, `open-failed`, `write-failed` and `commit-failed`. With
+  `mkdir: true` the parent directories are created before the write. Both
+  operations use the same path cleaning as `file.copy` — absolute, no NUL,
+  canonicalised, never through a symlinked parent — and neither reads or
+  writes a directory.)
 - `kwin.subscribe`, `kwin.command`, `kwin.layout.update`
 - `kwin.animation.update-targets`, `kwin.animation.prepare-launch`
 - `wallpaper.plasma.proxy` (replace every screen's Plasma wallpaper with a KOS
