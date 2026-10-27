@@ -359,10 +359,12 @@ ColumnLayout {
         // -2 = an import is already running (its completion refreshes too);
         // -1 = the folder does not exist (errorOccurred already reported).
         const started = bridge.importGalleryFolder(folder)
-        if (started === 0)
+        if (started === 0 || started === -2) {
             importingFolder = true
-        else
+            errorText = ""
+        } else {
             refreshGallery()
+        }
     }
 
     // Folder copies hash, decode and write off the GUI thread; refresh on
@@ -753,7 +755,7 @@ ColumnLayout {
         Layout.fillWidth: true
         Layout.leftMargin: 16
         visible: page.spatialBusy || page.spatialPreparing || page.modelsChecking
-        text: page.modelsChecking ? I18n.tr("Checking the spatial wallpaper model…") : I18n.tr("Preparing spatial wallpaper; cancel from the preview or Services and components…")
+        text: page.modelsChecking ? I18n.tr("Checking the spatial wallpaper model…") : I18n.tr("Preparing spatial wallpaper; cancel from the preview or Extensions and services…")
         color: page.colors.secondaryText
         font.pixelSize: 12
     }

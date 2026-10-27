@@ -274,6 +274,7 @@ Optional components are installed by naming them:
   ./tools/kosctl install lockscreen   # lock screen (user level, no root)
   ./tools/kosctl install apps         # Calendar, Calculator, Todo, Weather
   ./tools/kosctl install apps --with-listenfree # also build ListenFree + audio SDK
+  ./tools/kosctl install apps --with-listenfree-video # also enable video features
   ./tools/kosctl uninstall lockscreen
 
 Plain `install` / `uninstall` cover the core desktop only -- no apps, no lock
@@ -723,6 +724,15 @@ build_kwin_glass() {
 
 build() {
     detect_kwin_plugin_api_version
+    if (( kwin_plugin_rebuild_required )); then
+        # A KWin package upgrade changes the imported library's absolute path
+        # (for example libkwin.so.6.8.0 -> libkwin.so.6.8.1). Cleaning object
+        # files alone leaves Ninja holding the old path as a generated-file
+        # dependency. Drop both configure stamps so CMake regenerates the link
+        # rules before the clean rebuild.
+        rm -f -- "$build_dir/kos-configure-inputs" \
+            "$glass_build_dir/kos-configure-inputs"
+    fi
     configure_build
     if (( kwin_plugin_rebuild_required )); then
         cmake --build "$build_dir" --target clean
